@@ -1,0 +1,305 @@
+// src/App.js
+import React, { useState, useEffect } from "react";
+import { jsPDF } from "jspdf";
+import autoTable from "jspdf-autotable";
+import "./fonts/Roboto-Regular-normal"; // <--- pārliecinies, ka šis fails ir src/fonts/
+
+function App() {
+  const [items, setItems] = useState([]);
+  const [newItem, setNewItem] = useState({ nosaukums: "", daudzums: 1, cena: 0 });
+  const [clientInfo, setClientInfo] = useState(""); // Pircējs
+  const [paymentMethod, setPaymentMethod] = useState("Ar maksājuma karti");
+
+  // invoice number: start from 2501 if none in storage
+  const [invoiceNumber, setInvoiceNumber] = useState(() => {
+    const v = localStorage.getItem("invoiceNumber");
+    return v ? parseInt(v, 10) : 2501;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("invoiceNumber", invoiceNumber);
+  }, [invoiceNumber]);
+
+  const addItem = () => {
+    if (!newItem.nosaukums || newItem.daudzums <= 0 || newItem.cena <= 0) return;
+    setItems([...items, { ...newItem }]);
+    setNewItem({ nosaukums: "", daudzums: 1, cena: 0 });
+  };
+
+  const removeItem = (idx) => {
+    const copy = items.slice();
+    copy.splice(idx, 1);
+    setItems(copy);
+  };
+
+  const formatDate = (date) => {
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    return `${dd}.${mm}.${yyyy}`;
+  };
+
+  const createDoc = (invNumber) => {
+    const doc = new jsPDF();
+    doc.setFont("Roboto-Regular", "normal");
+
+    // Header
+    doc.setFontSize(18);
+    doc.text(`Rēķins Nr. ${invNumber}`, 105, 20, { align: "center" });
+    doc.setFontSize(12);
+    const dateStr = formatDate(new Date());
+    doc.text(`Datums: ${dateStr}`, 20, 30);
+
+    // Company info
+    const companyInfo = [
+      "Baltkem group, SIA",
+      "Reģ. nr.: 40103354396",
+      "PVN nr.: LV40103354396",
+      "Juridiskā adrese: Anniņmuižas bulvāris 60 - 4, Rīga, LV-1029",
+      "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
+    ];
+    let y = 45;
+    doc.setFontSize(11);
+    companyInfo.forEach((line) => {
+      doc.text(line, 20, y);
+      y += 6.5;
+    });
+
+    // Pircējs
+    if (clientInfo && clientInfo.trim()) {
+      y += 4;
+      doc.setFontSize(11);
+      doc.text("Pircējs:", 20, y);
+      y += 6;
+      const splitClient = doc.splitTextToSize(clientInfo, 170);
+      doc.text(splitClient, 20, y);
+      y += splitClient.length * 6.5;
+    }
+
+    // Apmaksas kārtība
+    y += 8;
+    doc.setFontSize(11);
+    doc.text(`Apmaksas kārtība: ${paymentMethod}`, 20, y);
+
+    // Table data
+    const body = items.map((it) => {
+      const cenaArPVN = Number(it.cena) || 0;
+      const cenaBezPVN = cenaArPVN / 1.21;
+      const pvn = cenaArPVN - cenaBezPVN;
+      const summaArPVN = cenaArPVN * (Number(it.daudzums) || 1);
+      return [
+        it.nosaukums,
+        String(it.daudzums),
+        cenaBezPVN.toFixed(2),
+        pvn.toFixed(2),
+        cenaArPVN.toFixed(2),
+        summaArPVN.toFixed(2),
+      ];
+    });
+
+    autoTable(doc, {
+      startY: y + 8,
+      head: [[
+        "Pakalpojums",
+        "Daudzums",
+        "Cena bez PVN (€)",
+        "PVN (€/gab)",
+        "Cena ar PVN (€)",
+        "Summa ar PVN (€)"
+      ]],
+      body: body,
+      styles: {
+        font: "Roboto-Regular",
+        fontSize: 10,
+      },
+      headStyles: {
+        fillColor: [50, 50, 50], // tumši pelēks
+        textColor: [255, 255, 255], // balts teksts
+        font: "Roboto-Regular",
+        fontStyle: "bold",
+      },
+      columnStyles: {
+        0: { cellWidth: 60 },
+        1: { halign: "center", cellWidth: 18 },
+        2: { halign: "right", cellWidth: 28 },
+        3: { halign: "right", cellWidth: 28 },
+        4: { halign: "right", cellWidth: 28 },
+        5: { halign: "right", cellWidth: 30 },
+      },
+    });
+
+    const totalArPVN = items.reduce((s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1), 0);
+    const totalBezPVN = totalArPVN / 1.21;
+    const totalPVN = totalArPVN - totalBezPVN;
+
+    const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : y + 40;
+    doc.setFontSize(11);
+    doc.text(`Summa bez PVN: ${totalBezPVN.toFixed(2)} €`, 140, finalY);
+    doc.text(`PVN 21%: ${totalPVN.toFixed(2)} €`, 140, finalY + 7);
+    doc.text(`Kopā (ar PVN): ${totalArPVN.toFixed(2)} €`, 140, finalY + 14);
+
+    return doc;
+  };
+
+  const handleGenerateAndDownload = () => {
+    if (items.length === 0) {
+      alert("Pievieno vismaz vienu pakalpojumu, lai ģenerētu rēķinu.");
+      return;
+    }
+    const doc = createDoc(invoiceNumber);
+    doc.save(`rekins_${invoiceNumber}.pdf`);
+    setInvoiceNumber((n) => {
+      const next = Number(n) + 1;
+      localStorage.setItem("invoiceNumber", next);
+      return next;
+    });
+  };
+
+  const handleShare = async () => {
+    if (items.length === 0) {
+      alert("Pievieno vismaz vienu pakalpojumu, lai kopīgotu rēķinu.");
+      return;
+    }
+    const doc = createDoc(invoiceNumber);
+    const blob = doc.output("blob");
+    const file = new File([blob], `rekins_${invoiceNumber}.pdf`, { type: "application/pdf" });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: `Rēķins Nr. ${invoiceNumber}`,
+          text: `Rēķins Nr. ${invoiceNumber}`,
+        });
+        setInvoiceNumber((n) => {
+          const next = Number(n) + 1;
+          localStorage.setItem("invoiceNumber", next);
+          return next;
+        });
+      } catch (err) {
+        console.error("Share failed:", err);
+        alert("Dalīšanās atcelta vai neizdevās.");
+      }
+    } else {
+      alert("Dalīšanās ar failiem nav atbalstīta šajā ierīcē/pārlūkā.");
+    }
+  };
+
+  const previewTotalArPVN = items.reduce((s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1), 0);
+  const previewTotalBezPVN = previewTotalArPVN / 1.21;
+  const previewPVN = previewTotalArPVN - previewTotalBezPVN;
+
+  return (
+    <div style={{ padding: 20, fontFamily: "Arial, sans-serif" }}>
+      <h1>Rēķinu ģenerators</h1>
+
+      <div style={{ marginBottom: 12 }}>
+        <strong>Rēķina Nr.:</strong> {invoiceNumber} &nbsp;&nbsp;
+        <strong>Datums:</strong> {formatDate(new Date())}
+      </div>
+
+      {/* Pircējs */}
+      <div style={{ marginBottom: 12 }}>
+        <label><strong>Pircējs (ja nepieciešams):</strong></label><br />
+        <textarea
+          placeholder="Ieraksti pircēja datus šeit..."
+          value={clientInfo}
+          onChange={(e) => setClientInfo(e.target.value)}
+          rows={3}
+          style={{ width: "100%", boxSizing: "border-box" }}
+        />
+      </div>
+
+      {/* Apmaksas kārtība */}
+      <div style={{ marginBottom: 12 }}>
+        <label><strong>Apmaksas kārtība:</strong></label><br />
+        <select
+          value={paymentMethod}
+          onChange={(e) => setPaymentMethod(e.target.value)}
+          style={{ width: "100%", padding: 6 }}
+        >
+          <option>Ar maksājuma karti</option>
+          <option>Ar bankas pārskaitījumu</option>
+          <option>Skaidra nauda</option>
+        </select>
+      </div>
+
+      {/* Forma pakalpojumam */}
+      <div style={{ marginBottom: 12 }}>
+        <input
+          type="text"
+          placeholder="Pakalpojums (piem., Riepu montāža)"
+          value={newItem.nosaukums}
+          onChange={(e) => setNewItem({ ...newItem, nosaukums: e.target.value })}
+          style={{ marginRight: 8, width: "48%" }}
+        />
+        <input
+          type="number"
+          placeholder="Daudzums"
+          value={newItem.daudzums}
+          onChange={(e) => setNewItem({ ...newItem, daudzums: Number(e.target.value) })}
+          style={{ marginRight: 8, width: 100 }}
+        />
+        <input
+          type="number"
+          placeholder="Cena ar PVN (€)"
+          value={newItem.cena}
+          onChange={(e) => setNewItem({ ...newItem, cena: Number(e.target.value) })}
+          style={{ marginRight: 8, width: 140 }}
+        />
+        <button onClick={addItem}>Pievienot</button>
+      </div>
+
+      {/* Preview tabula */}
+      <table border="1" cellPadding="6" style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
+        <thead style={{ background: "#333", color: "#fff" }}>
+          <tr>
+            <th>Pakalpojums</th>
+            <th>Daudzums</th>
+            <th>Cena ar PVN (€)</th>
+            <th>Cena bez PVN (€)</th>
+            <th>PVN (€/gab)</th>
+            <th>Summa ar PVN (€)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((it, idx) => {
+            const cenaArPVN = Number(it.cena) || 0;
+            const cenaBezPVN = cenaArPVN / 1.21;
+            const pvn = cenaArPVN - cenaBezPVN;
+            const summa = cenaArPVN * (Number(it.daudzums) || 1);
+            return (
+              <tr key={idx}>
+                <td>{it.nosaukums}</td>
+                <td style={{ textAlign: "center" }}>{it.daudzums}</td>
+                <td style={{ textAlign: "right" }}>{cenaArPVN.toFixed(2)}</td>
+                <td style={{ textAlign: "right" }}>{cenaBezPVN.toFixed(2)}</td>
+                <td style={{ textAlign: "right" }}>{pvn.toFixed(2)}</td>
+                <td style={{ textAlign: "right" }}>{summa.toFixed(2)}</td>
+                <td style={{ textAlign: "center" }}>
+                  <button onClick={() => removeItem(idx)}>Dzēst</button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div style={{ marginBottom: 12, textAlign: "right" }}>
+        <div>Summa bez PVN: {previewTotalBezPVN.toFixed(2)} €</div>
+        <div>PVN 21%: {previewPVN.toFixed(2)} €</div>
+        <div><strong>Kopā (ar PVN): {previewTotalArPVN.toFixed(2)} €</strong></div>
+      </div>
+
+      <div>
+        <button onClick={handleGenerateAndDownload} style={{ marginRight: 8 }}>
+          Lejupielādēt rēķinu (PDF)
+        </button>
+        <button onClick={handleShare}>Dalīties (WhatsApp / Share)</button>
+      </div>
+    </div>
+  );
+}
+
+export default App;
