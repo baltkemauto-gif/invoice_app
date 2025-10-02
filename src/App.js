@@ -185,6 +185,14 @@ function App() {
     }
   };
 
+  // 🔴 Atiestatīšanas funkcija
+  const handleResetInvoiceNumber = () => {
+    if (window.confirm("Vai tiešām vēlies atiestatīt rēķinu numurāciju uz 2501?")) {
+      setInvoiceNumber(2501);
+      localStorage.setItem("invoiceNumber", 2501);
+    }
+  };
+
   const previewTotalArPVN = items.reduce((s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1), 0);
   const previewTotalBezPVN = previewTotalArPVN / 1.21;
   const previewPVN = previewTotalArPVN - previewTotalBezPVN;
@@ -296,7 +304,12 @@ function App() {
         <button onClick={handleGenerateAndDownload} style={{ marginRight: 8 }}>
           Lejupielādēt rēķinu (PDF)
         </button>
-        <button onClick={handleShare}>Dalīties (WhatsApp / Share)</button>
+        <button onClick={handleShare} style={{ marginRight: 8 }}>
+          Dalīties (WhatsApp / Share)
+        </button>
+        <button onClick={handleResetInvoiceNumber} style={{ background: "red", color: "white" }}>
+          Atiestatīt numerāciju
+        </button>
       </div>
     </div>
   );
