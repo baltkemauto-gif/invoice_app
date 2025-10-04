@@ -2,23 +2,43 @@
 import React, { useState, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
-import "./fonts/Roboto-Regular-normal"; // <--- pārliecinies, ka šis fails ir src/fonts/
+import "./fonts/Roboto-Regular-normal";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { db } from "./firebase";
 
 function App() {
   const [items, setItems] = useState([]);
   const [newItem, setNewItem] = useState({ nosaukums: "", daudzums: 1, cena: 0 });
-  const [clientInfo, setClientInfo] = useState(""); // Pircējs
+  const [clientInfo, setClientInfo] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Ar maksājuma karti");
 
-  // invoice number: start from 2501 if none in storage
-  const [invoiceNumber, setInvoiceNumber] = useState(() => {
-    const v = localStorage.getItem("invoiceNumber");
-    return v ? parseInt(v, 10) : 2501;
-  });
+  const [invoiceNumber, setInvoiceNumber] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [manualEdit, setManualEdit] = useState(false);
 
+  // 🔹 Nolasīt rēķina numuru no Firebase
   useEffect(() => {
-    localStorage.setItem("invoiceNumber", invoiceNumber);
-  }, [invoiceNumber]);
+    const fetchInvoiceNumber = async () => {
+      const docRef = doc(db, "settings", "invoiceNumber");
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        setInvoiceNumber(docSnap.data().value);
+      } else {
+        await setDoc(docRef, { value: 2501 });
+        setInvoiceNumber(2501);
+      }
+      setIsLoading(false);
+    };
+
+    fetchInvoiceNumber();
+  }, []);
+
+  // 🔹 Saglabā numuru Firebase
+  const updateInvoiceNumber = async (newNumber) => {
+    setInvoiceNumber(newNumber);
+    await setDoc(doc(db, "settings", "invoiceNumber"), { value: newNumber });
+  };
 
   const addItem = () => {
     if (!newItem.nosaukums || newItem.daudzums <= 0 || newItem.cena <= 0) return;
@@ -43,14 +63,12 @@ function App() {
     const doc = new jsPDF();
     doc.setFont("Roboto-Regular", "normal");
 
-    // Header
     doc.setFontSize(18);
     doc.text(`Rēķins Nr. ${invNumber}`, 105, 20, { align: "center" });
     doc.setFontSize(12);
     const dateStr = formatDate(new Date());
     doc.text(`Datums: ${dateStr}`, 20, 30);
 
-    // Company info
     const companyInfo = [
       "Baltkem group, SIA",
       "Reģ. nr.: 40103354396",
@@ -60,7 +78,6 @@ function App() {
     ];
     let y = 45;
 
-    // līnija virs
     doc.setLineWidth(0.1);
     doc.setDrawColor(150);
     doc.setLineDash([2, 2], 0);
@@ -72,11 +89,9 @@ function App() {
       y += 6.5;
     });
 
-    // līnija zem
     doc.line(20, y + 2, 190, y + 2);
-    doc.setLineDash([]); // reset dash
+    doc.setLineDash([]);
 
-    // Pircējs
     if (clientInfo && clientInfo.trim()) {
       y += 10;
       doc.setFontSize(11);
@@ -87,12 +102,10 @@ function App() {
       y += splitClient.length * 6.5;
     }
 
-    // Apmaksas kārtība
     y += 8;
     doc.setFontSize(11);
     doc.text(`Apmaksas kārtība: ${paymentMethod}`, 20, y);
 
-    // Table data
     const body = items.map((it) => {
       const cenaArPVN = Number(it.cena) || 0;
       const summaArPVN = cenaArPVN * (Number(it.daudzums) || 1);
@@ -106,17 +119,9 @@ function App() {
 
     autoTable(doc, {
       startY: y + 8,
-      head: [[
-        "Pakalpojums/Prece",
-        "Daudzums",
-        "Cena ar PVN (€)",
-        "Summa ar PVN (€)"
-      ]],
+      head: [["Pakalpojums/Prece", "Daudzums", "Cena ar PVN (€)", "Summa ar PVN (€)"]],
       body: body,
-      styles: {
-        font: "Roboto-Regular",
-        fontSize: 10,
-      },
+      styles: { font: "Roboto-Regular", fontSize: 10 },
       headStyles: {
         fillColor: [50, 50, 50],
         textColor: [255, 255, 255],
@@ -141,7 +146,6 @@ function App() {
     doc.text(`PVN 21%: ${totalPVN.toFixed(2)} €`, 140, finalY + 7);
     doc.text(`Kopā (ar PVN): ${totalArPVN.toFixed(2)} €`, 140, finalY + 14);
 
-    // Apakšas piezīme
     const pageHeight = doc.internal.pageSize.height;
     doc.setFontSize(9);
     doc.setTextColor(120);
@@ -155,18 +159,15 @@ function App() {
     return doc;
   };
 
-  const handleGenerateAndDownload = () => {
+  const handleGenerateAndDownload = async () => {
     if (items.length === 0) {
       alert("Pievieno vismaz vienu pakalpojumu, lai ģenerētu rēķinu.");
       return;
     }
     const doc = createDoc(invoiceNumber);
     doc.save(`rekins_${invoiceNumber}.pdf`);
-    setInvoiceNumber((n) => {
-      const next = Number(n) + 1;
-      localStorage.setItem("invoiceNumber", next);
-      return next;
-    });
+    const next = invoiceNumber + 1;
+    await updateInvoiceNumber(next);
   };
 
   const handleShare = async () => {
@@ -185,11 +186,8 @@ function App() {
           title: `Rēķins Nr. ${invoiceNumber}`,
           text: `Rēķins Nr. ${invoiceNumber}`,
         });
-        setInvoiceNumber((n) => {
-          const next = Number(n) + 1;
-          localStorage.setItem("invoiceNumber", next);
-          return next;
-        });
+        const next = invoiceNumber + 1;
+        await updateInvoiceNumber(next);
       } catch (err) {
         console.error("Share failed:", err);
         alert("Dalīšanās atcelta vai neizdevās.");
@@ -199,13 +197,15 @@ function App() {
     }
   };
 
-  // Atiestatīšanas funkcija
-  const handleResetInvoiceNumber = () => {
-    if (window.confirm("Vai tiešām vēlies atiestatīt rēķinu numurāciju uz 2501?")) {
-      setInvoiceNumber(2501);
-      localStorage.setItem("invoiceNumber", 2501);
+  const handleManualChange = async () => {
+    const newNumber = prompt("Ievadi jaunu rēķina numuru:", invoiceNumber);
+    if (newNumber && !isNaN(Number(newNumber))) {
+      await updateInvoiceNumber(Number(newNumber));
+      alert(`Rēķina numurs mainīts uz ${newNumber}`);
     }
   };
+
+  if (isLoading) return <div style={{ padding: 20 }}>Notiek ielāde...</div>;
 
   const previewTotalArPVN = items.reduce((s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1), 0);
   const previewTotalBezPVN = previewTotalArPVN / 1.21;
@@ -217,10 +217,10 @@ function App() {
 
       <div style={{ marginBottom: 12 }}>
         <strong>Rēķina Nr.:</strong> {invoiceNumber} &nbsp;&nbsp;
+        <button onClick={handleManualChange}>✎ Mainīt</button> &nbsp;&nbsp;
         <strong>Datums:</strong> {formatDate(new Date())}
       </div>
 
-      {/* Pircējs */}
       <div style={{ marginBottom: 12 }}>
         <label><strong>Pircējs (ja nepieciešams):</strong></label><br />
         <textarea
@@ -232,7 +232,6 @@ function App() {
         />
       </div>
 
-      {/* Apmaksas kārtība */}
       <div style={{ marginBottom: 12 }}>
         <label><strong>Apmaksas kārtība:</strong></label><br />
         <select
@@ -246,7 +245,6 @@ function App() {
         </select>
       </div>
 
-      {/* Forma pakalpojumam */}
       <div style={{ marginBottom: 12 }}>
         <input
           type="text"
@@ -272,7 +270,6 @@ function App() {
         <button onClick={addItem}>Pievienot</button>
       </div>
 
-      {/* Preview tabula */}
       <table border="1" cellPadding="6" style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
         <thead style={{ background: "#333", color: "#fff" }}>
           <tr>
@@ -314,9 +311,6 @@ function App() {
         </button>
         <button onClick={handleShare} style={{ marginRight: 8 }}>
           Dalīties (WhatsApp / Share)
-        </button>
-        <button onClick={handleResetInvoiceNumber} style={{ background: "red", color: "white" }}>
-          Atiestatīt numerāciju
         </button>
       </div>
     </div>
