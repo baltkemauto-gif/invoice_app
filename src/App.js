@@ -59,15 +59,26 @@ function App() {
       "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
     ];
     let y = 45;
+
+    // līnija virs
+    doc.setLineWidth(0.1);
+    doc.setDrawColor(150);
+    doc.setLineDash([2, 2], 0);
+    doc.line(20, y - 5, 190, y - 5);
+
     doc.setFontSize(11);
     companyInfo.forEach((line) => {
       doc.text(line, 20, y);
       y += 6.5;
     });
 
+    // līnija zem
+    doc.line(20, y + 2, 190, y + 2);
+    doc.setLineDash([]); // reset dash
+
     // Pircējs
     if (clientInfo && clientInfo.trim()) {
-      y += 4;
+      y += 10;
       doc.setFontSize(11);
       doc.text("Pircējs:", 20, y);
       y += 6;
@@ -84,14 +95,10 @@ function App() {
     // Table data
     const body = items.map((it) => {
       const cenaArPVN = Number(it.cena) || 0;
-      const cenaBezPVN = cenaArPVN / 1.21;
-      const pvn = cenaArPVN - cenaBezPVN;
       const summaArPVN = cenaArPVN * (Number(it.daudzums) || 1);
       return [
         it.nosaukums,
         String(it.daudzums),
-        cenaBezPVN.toFixed(2),
-        pvn.toFixed(2),
         cenaArPVN.toFixed(2),
         summaArPVN.toFixed(2),
       ];
@@ -100,10 +107,8 @@ function App() {
     autoTable(doc, {
       startY: y + 8,
       head: [[
-        "Pakalpojums",
+        "Pakalpojums/Prece",
         "Daudzums",
-        "Cena bez PVN (€)",
-        "PVN (€/gab)",
         "Cena ar PVN (€)",
         "Summa ar PVN (€)"
       ]],
@@ -113,18 +118,16 @@ function App() {
         fontSize: 10,
       },
       headStyles: {
-        fillColor: [50, 50, 50], // tumši pelēks
-        textColor: [255, 255, 255], // balts teksts
+        fillColor: [50, 50, 50],
+        textColor: [255, 255, 255],
         font: "Roboto-Regular",
         fontStyle: "bold",
       },
       columnStyles: {
-        0: { cellWidth: 60 },
-        1: { halign: "center", cellWidth: 18 },
-        2: { halign: "right", cellWidth: 28 },
-        3: { halign: "right", cellWidth: 28 },
-        4: { halign: "right", cellWidth: 28 },
-        5: { halign: "right", cellWidth: 30 },
+        0: { cellWidth: 80 },
+        1: { halign: "center", cellWidth: 20 },
+        2: { halign: "right", cellWidth: 40 },
+        3: { halign: "right", cellWidth: 40 },
       },
     });
 
@@ -137,6 +140,17 @@ function App() {
     doc.text(`Summa bez PVN: ${totalBezPVN.toFixed(2)} €`, 140, finalY);
     doc.text(`PVN 21%: ${totalPVN.toFixed(2)} €`, 140, finalY + 7);
     doc.text(`Kopā (ar PVN): ${totalArPVN.toFixed(2)} €`, 140, finalY + 14);
+
+    // Apakšas piezīme
+    const pageHeight = doc.internal.pageSize.height;
+    doc.setFontSize(9);
+    doc.setTextColor(120);
+    doc.text(
+      "Rēķins sagatavots elektroniski un ir derīgs bez paraksta.",
+      105,
+      pageHeight - 10,
+      { align: "center" }
+    );
 
     return doc;
   };
@@ -185,7 +199,7 @@ function App() {
     }
   };
 
-  // 🔴 Atiestatīšanas funkcija
+  // Atiestatīšanas funkcija
   const handleResetInvoiceNumber = () => {
     if (window.confirm("Vai tiešām vēlies atiestatīt rēķinu numurāciju uz 2501?")) {
       setInvoiceNumber(2501);
@@ -236,7 +250,7 @@ function App() {
       <div style={{ marginBottom: 12 }}>
         <input
           type="text"
-          placeholder="Pakalpojums (piem., Riepu montāža)"
+          placeholder="Pakalpojums/Prece"
           value={newItem.nosaukums}
           onChange={(e) => setNewItem({ ...newItem, nosaukums: e.target.value })}
           style={{ marginRight: 8, width: "48%" }}
@@ -262,11 +276,9 @@ function App() {
       <table border="1" cellPadding="6" style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
         <thead style={{ background: "#333", color: "#fff" }}>
           <tr>
-            <th>Pakalpojums</th>
+            <th>Pakalpojums/Prece</th>
             <th>Daudzums</th>
             <th>Cena ar PVN (€)</th>
-            <th>Cena bez PVN (€)</th>
-            <th>PVN (€/gab)</th>
             <th>Summa ar PVN (€)</th>
             <th></th>
           </tr>
@@ -274,16 +286,12 @@ function App() {
         <tbody>
           {items.map((it, idx) => {
             const cenaArPVN = Number(it.cena) || 0;
-            const cenaBezPVN = cenaArPVN / 1.21;
-            const pvn = cenaArPVN - cenaBezPVN;
             const summa = cenaArPVN * (Number(it.daudzums) || 1);
             return (
               <tr key={idx}>
                 <td>{it.nosaukums}</td>
                 <td style={{ textAlign: "center" }}>{it.daudzums}</td>
                 <td style={{ textAlign: "right" }}>{cenaArPVN.toFixed(2)}</td>
-                <td style={{ textAlign: "right" }}>{cenaBezPVN.toFixed(2)}</td>
-                <td style={{ textAlign: "right" }}>{pvn.toFixed(2)}</td>
                 <td style={{ textAlign: "right" }}>{summa.toFixed(2)}</td>
                 <td style={{ textAlign: "center" }}>
                   <button onClick={() => removeItem(idx)}>Dzēst</button>
