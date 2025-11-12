@@ -14,7 +14,6 @@ function App() {
 
   const [invoiceNumber, setInvoiceNumber] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [manualEdit, setManualEdit] = useState(false);
 
   // 🔹 Nolasīt rēķina numuru no Firebase
   useEffect(() => {
@@ -70,41 +69,29 @@ function App() {
     doc.text(`Datums: ${dateStr}`, 20, 30);
 
     const companyInfo = [
-  "Baltkem group, SIA",
-  "Reģ. nr.: 40103354396",
-  "PVN nr.: LV40103354396",
-  "Juridiskā adrese: Anniņmuižas bulvāris 60 - 4, Rīga, LV-1029",
-  "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
-  "Banka: AS SEB banka",
-  "Konts (IBAN): LV87UNLA0050016410133",
-];
+      "Baltkem group, SIA",
+      "Reģ. nr.: 40103354396",
+      "PVN nr.: LV40103354396",
+      "Juridiskā adrese: Anniņmuižas bulvāris 60 - 4, Rīga, LV-1029",
+      "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
+      "AS “SEB banka”",
+      "LV87UNLA0050016410133",
+    ];
 
-let y = 45;
+    let y = 45;
+    doc.setLineWidth(0.1);
+    doc.setDrawColor(150);
+    doc.setLineDash([2, 2], 0);
+    doc.line(20, y - 5, 190, y - 5);
 
-// 🔹 Līnija virs rekvizītiem
-doc.setLineWidth(0.1);
-doc.setDrawColor(150);
-doc.setLineDash([2, 2], 0);
-doc.line(20, y - 5, 190, y - 5);
+    doc.setFontSize(11);
+    companyInfo.forEach((line) => {
+      doc.text(line, 20, y);
+      y += 6.5;
+    });
 
-// 🔹 Uzņēmuma rekvizīti
-doc.setFont("Roboto-Regular", "normal");
-doc.setFontSize(11);
-
-companyInfo.forEach((line) => {
-  doc.text(line, 20, y);
-  y += 6.5;
-});
-
-// 🔹 Pievienojam nedaudz lielāku atstarpi pirms līnijas zem rekvizītiem,
-// lai telefons nerāda to pāri pēdējai rindai
-y += 2;
-doc.setLineDash([]);
-doc.line(20, y + 4, 190, y + 4);
-doc.setLineDash([]);
-
-// neliela atstarpe pirms nākamās sadaļas
-y += 10;
+    doc.line(20, y + 2, 190, y + 2);
+    doc.setLineDash([]);
 
     if (clientInfo && clientInfo.trim()) {
       y += 10;
@@ -150,7 +137,10 @@ y += 10;
       },
     });
 
-    const totalArPVN = items.reduce((s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1), 0);
+    const totalArPVN = items.reduce(
+      (s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1),
+      0
+    );
     const totalBezPVN = totalArPVN / 1.21;
     const totalPVN = totalArPVN - totalBezPVN;
 
@@ -221,7 +211,10 @@ y += 10;
 
   if (isLoading) return <div style={{ padding: 20 }}>Notiek ielāde...</div>;
 
-  const previewTotalArPVN = items.reduce((s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1), 0);
+  const previewTotalArPVN = items.reduce(
+    (s, it) => s + (Number(it.cena) || 0) * (Number(it.daudzums) || 1),
+    0
+  );
   const previewTotalBezPVN = previewTotalArPVN / 1.21;
   const previewPVN = previewTotalArPVN - previewTotalBezPVN;
 
@@ -284,7 +277,11 @@ y += 10;
         <button onClick={addItem}>Pievienot</button>
       </div>
 
-      <table border="1" cellPadding="6" style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}>
+      <table
+        border="1"
+        cellPadding="6"
+        style={{ borderCollapse: "collapse", width: "100%", marginBottom: 12 }}
+      >
         <thead style={{ background: "#333", color: "#fff" }}>
           <tr>
             <th>Pakalpojums/Prece</th>
@@ -316,7 +313,9 @@ y += 10;
       <div style={{ marginBottom: 12, textAlign: "right" }}>
         <div>Summa bez PVN: {previewTotalBezPVN.toFixed(2)} €</div>
         <div>PVN 21%: {previewPVN.toFixed(2)} €</div>
-        <div><strong>Kopā (ar PVN): {previewTotalArPVN.toFixed(2)} €</strong></div>
+        <div>
+          <strong>Kopā (ar PVN): {previewTotalArPVN.toFixed(2)} €</strong>
+        </div>
       </div>
 
       <div>
