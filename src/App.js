@@ -70,27 +70,41 @@ function App() {
     doc.text(`Datums: ${dateStr}`, 20, 30);
 
     const companyInfo = [
-      "Baltkem group, SIA",
-      "Reģ. nr.: 40103354396",
-      "PVN nr.: LV40103354396",
-      "Juridiskā adrese: Anniņmuižas bulvāris 60 - 4, Rīga, LV-1029",
-      "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
-    ];
-    let y = 45;
+  "Baltkem group, SIA",
+  "Reģ. nr.: 40103354396",
+  "PVN nr.: LV40103354396",
+  "Juridiskā adrese: Anniņmuižas bulvāris 60 - 4, Rīga, LV-1029",
+  "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
+  "Banka: AS SEB banka",
+  "Konts (IBAN): LV87UNLA0050016410133",
+];
 
-    doc.setLineWidth(0.1);
-    doc.setDrawColor(150);
-    doc.setLineDash([2, 2], 0);
-    doc.line(20, y - 5, 190, y - 5);
+let y = 45;
 
-    doc.setFontSize(11);
-    companyInfo.forEach((line) => {
-      doc.text(line, 20, y);
-      y += 6.5;
-    });
+// 🔹 Līnija virs rekvizītiem
+doc.setLineWidth(0.1);
+doc.setDrawColor(150);
+doc.setLineDash([2, 2], 0);
+doc.line(20, y - 5, 190, y - 5);
 
-    doc.line(20, y + 2, 190, y + 2);
-    doc.setLineDash([]);
+// 🔹 Uzņēmuma rekvizīti
+doc.setFont("Roboto-Regular", "normal");
+doc.setFontSize(11);
+
+companyInfo.forEach((line) => {
+  doc.text(line, 20, y);
+  y += 6.5;
+});
+
+// 🔹 Pievienojam nedaudz lielāku atstarpi pirms līnijas zem rekvizītiem,
+// lai telefons nerāda to pāri pēdējai rindai
+y += 2;
+doc.setLineDash([]);
+doc.line(20, y + 4, 190, y + 4);
+doc.setLineDash([]);
+
+// neliela atstarpe pirms nākamās sadaļas
+y += 10;
 
     if (clientInfo && clientInfo.trim()) {
       y += 10;
