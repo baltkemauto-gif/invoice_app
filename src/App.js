@@ -73,7 +73,7 @@ function App() {
       "Reģ. nr.: 40103354396",
       "PVN nr.: LV40103354396",
       "Juridiskā adrese: Anniņmuižas bulvāris 60 - 4, Rīga, LV-1029",
-      "Faktiskā adrese: Lazdu iela 16D, Rīga, LV-1029",
+      "Faktiskā adrese: Beberbeķu iela 58, Rīga, LV-1029",
       "AS “SEB banka”",
       "LV87UNLA0050016410133",
     ];
